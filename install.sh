@@ -16,7 +16,7 @@ set -e
 # Get the latest version before running the script #
 get_release() {
 curl --silent \
-  -H "Accept: application/vnd.github.v3+json" \
+  -H "Accept: application/vnd.github.com/v3+json" \
   https://api.github.com/repos/Ferks-FK/ControlPanel-Installer/releases/latest |
   grep '"tag_name":' |
   sed -E 's/.*"([^"]+)".*/\1/'
@@ -507,7 +507,7 @@ basic_deps() {
   case "$OS" in
     debian | ubuntu)
       apt-get update -y -qq
-      # Adding dirmngr to fix potential issues with key fetching (e.g., MariaDB/Sury)
+      # Adding dirmngr, git, curl, net-tools for robustness
       apt-get install -y -qq dirmngr curl git wget unzip tar net-tools
     ;;
     centos)
@@ -532,8 +532,8 @@ apt-get update -y && apt-get upgrade -y
 # Add universe repository if you are on Ubuntu 18.04
 [ "$OS_VER_MAJOR" == "18" ] && apt-add-repository universe
 
-# Install Dependencies - ADDED php8.1-intl explicitly
-apt-get install -y php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl} mariadb-server nginx tar unzip git redis-server psmisc net-tools
+# Install Dependencies - ADDED php8.1-redis to fix "Class Redis not found"
+apt-get install -y php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl,redis} mariadb-server nginx tar unzip git redis-server psmisc net-tools
 
 # Enable services
 enable_services_debian_based
@@ -556,8 +556,8 @@ curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
 # Update repositories list
 apt-get update -y && apt-get upgrade -y
 
-# Install Dependencies - ADDED php8.1-intl explicitly
-apt-get install -y php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl} mariadb-server nginx tar unzip git redis-server psmisc net-tools
+# Install Dependencies - ADDED php8.1-redis to fix "Class Redis not found"
+apt-get install -y php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl,redis} mariadb-server nginx tar unzip git redis-server psmisc net-tools
 
 # Enable services
 enable_services_debian_based
@@ -579,8 +579,8 @@ if [ "$OS_VER_MAJOR" == "7" ]; then
     yum-config-manager -y --disable remi-php54
     yum-config-manager -y --enable remi-php81
 
-    # Install dependencies - ADDED php-intl explicitly
-    yum -y install php php-common php-tokenizer php-curl php-fpm php-cli php-json php-mysqlnd php-mcrypt php-gd php-mbstring php-pdo php-zip php-bcmath php-dom php-opcache php-intl mariadb-server nginx curl tar zip unzip git redis psmisc net-tools
+    # Install dependencies - ADDED php-redis to fix "Class Redis not found"
+    yum -y install php php-common php-tokenizer php-curl php-fpm php-cli php-json php-mysqlnd php-mcrypt php-gd php-mbstring php-pdo php-zip php-bcmath php-dom php-opcache php-intl php-redis mariadb-server nginx curl tar zip unzip git redis psmisc net-tools
     yum update -y
   elif [ "$OS_VER_MAJOR" == "8" ]; then
     # SELinux tools
@@ -593,8 +593,8 @@ if [ "$OS_VER_MAJOR" == "7" ]; then
     # Install MariaDB
     yum install -y mariadb mariadb-server
 
-    # Install dependencies - ADDED php-intl explicitly
-    yum install -y php php-common php-fpm php-cli php-json php-mysqlnd php-gd php-mbstring php-pdo php-zip php-bcmath php-dom php-opcache php-intl mariadb-server nginx curl tar zip unzip git redis psmisc net-tools
+    # Install dependencies - ADDED php-redis to fix "Class Redis not found"
+    yum install -y php php-common php-fpm php-cli php-json php-mysqlnd php-gd php-mbstring php-pdo php-zip php-bcmath php-dom php-opcache php-intl php-redis mariadb-server nginx curl tar zip unzip git redis psmisc net-tools
     yum update -y
 fi
 
@@ -612,7 +612,7 @@ sleep 2
 # Check Distro again for accurate dependency targeting
 check_distro
 
-# Install basic dependencies first (NEW)
+# Install basic dependencies first (FIX for intl/other errors)
 basic_deps
 
 case "$OS" in
@@ -682,6 +682,7 @@ uninstall_controlpanel() {
     fi
 
     print "Removing Nginx configuration..."
+    # Attempt to remove configuration files for both debian/ubuntu and centos
     if [ -f "/etc/nginx/sites-enabled/controlpanel.conf" ]; then
         rm -f /etc/nginx/sites-enabled/controlpanel.conf
     fi
