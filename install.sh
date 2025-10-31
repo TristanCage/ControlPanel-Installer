@@ -5,11 +5,11 @@ set -e
 
 ########################################################
 # 
-#           Pterodactyl-AutoThemes Installation
+#              Pterodactyl-AutoThemes Installation
 #
-#           Created and maintained by Goodness Tech
+#              Created and maintained by Goodness Tech
 #
-#             Protected by MIT License
+#                 Protected by MIT License
 #
 ########################################################
 
@@ -217,13 +217,13 @@ sleep 2
 
 case "$OS" in
     debian)
-      PHP_SOCKET="/run/php/php8.1-fpm.sock"
+      PHP_SOCKET="/run/php/php8.3-fpm.sock"
       [ "$OS_VER_MAJOR" == "9" ] && SUPPORTED=true
       [ "$OS_VER_MAJOR" == "10" ] && SUPPORTED=true
       [ "$OS_VER_MAJOR" == "11" ] && SUPPORTED=true
     ;;
     ubuntu)
-      PHP_SOCKET="/run/php/php8.1-fpm.sock"
+      PHP_SOCKET="/run/php/php8.3-fpm.sock"
       [ "$OS_VER_MAJOR" == "18" ] && SUPPORTED=true
       [ "$OS_VER_MAJOR" == "20" ] && SUPPORTED=true
       [ "$OS_VER_MAJOR" == "22" ] && SUPPORTED=true
@@ -478,10 +478,8 @@ fi
 configure_crontab() {
 print "Configuring Crontab"
 
-crontab -l | {
-  cat
-  echo "* * * * * php /var/www/controlpanel/artisan schedule:run >> /dev/null 2>&1"
-} | crontab -
+# FIX: Use a more reliable way to append the crontab entry
+(crontab -l 2>/dev/null; echo "* * * * * php /var/www/controlpanel/artisan schedule:run >> /dev/null 2>&1") | crontab -
 }
 
 configure_service() {
@@ -532,8 +530,8 @@ apt-get update -y && apt-get upgrade -y
 # Add universe repository if you are on Ubuntu 18.04
 [ "$OS_VER_MAJOR" == "18" ] && apt-add-repository universe
 
-# Install Dependencies - ADDED php8.1-redis to fix "Class Redis not found"
-apt-get install -y php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl,redis} mariadb-server nginx tar unzip git redis-server psmisc net-tools
+# Install Dependencies - NOW USING PHP 8.3
+apt-get install -y php8.3 php8.3-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl,redis} mariadb-server nginx tar unzip git redis-server psmisc net-tools
 
 # Enable services
 enable_services_debian_based
@@ -545,7 +543,7 @@ print "Installing dependencies for Debian ${OS_VER}"
 # MariaDB need dirmngr - already done in basic_deps but kept just in case
 apt-get install -y dirmngr
 
-# install PHP 8.1 using sury's repo
+# install PHP 8.3 using sury's repo
 apt-get install -y ca-certificates apt-transport-https lsb-release
 wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
 echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list
@@ -556,8 +554,8 @@ curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
 # Update repositories list
 apt-get update -y && apt-get upgrade -y
 
-# Install Dependencies - ADDED php8.1-redis to fix "Class Redis not found"
-apt-get install -y php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl,redis} mariadb-server nginx tar unzip git redis-server psmisc net-tools
+# Install Dependencies - NOW USING PHP 8.3
+apt-get install -y php8.3 php8.3-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl,redis} mariadb-server nginx tar unzip git redis-server psmisc net-tools
 
 # Enable services
 enable_services_debian_based
@@ -573,11 +571,11 @@ if [ "$OS_VER_MAJOR" == "7" ]; then
     # Install MariaDB
     curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
 
-    # Add remi repo (php8.1)
+    # Add remi repo (php8.3)
     yum install -y http://rpms.remirepo.net/enterprise/remi-release-7.rpm
     yum install -y yum-utils
     yum-config-manager -y --disable remi-php54
-    yum-config-manager -y --enable remi-php81
+    yum-config-manager -y --enable remi-php83
 
     # Install dependencies - ADDED php-redis to fix "Class Redis not found"
     yum -y install php php-common php-tokenizer php-curl php-fpm php-cli php-json php-mysqlnd php-mcrypt php-gd php-mbstring php-pdo php-zip php-bcmath php-dom php-opcache php-intl php-redis mariadb-server nginx curl tar zip unzip git redis psmisc net-tools
@@ -586,9 +584,9 @@ if [ "$OS_VER_MAJOR" == "7" ]; then
     # SELinux tools
     yum install -y policycoreutils selinux-policy selinux-policy-targeted setroubleshoot-server setools setools-console mcstrans
     
-    # Add remi repo (php8.1)
+    # Add remi repo (php8.3)
     yum install -y http://rpms.remirepo.net/enterprise/remi-release-8.rpm
-    yum module enable -y php:remi-8.1
+    yum module enable -y php:remi-8.3
 
     # Install MariaDB
     yum install -y mariadb mariadb-server
