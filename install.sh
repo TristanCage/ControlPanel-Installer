@@ -270,7 +270,6 @@ curl -so /var/www/controlpanel/.env.example "$GITHUB_URL"/configs/.env.example
 
 cd /var/www/controlpanel
 [ "$OS" == "centos" ] && export PATH=/usr/local/bin:$PATH
-# The "Class Redis not found" error happens here during the post-autoload-dump event
 COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader
 }
 
@@ -533,7 +532,7 @@ apt-get update -y && apt-get upgrade -y
 # Add universe repository if you are on Ubuntu 18.04
 [ "$OS_VER_MAJOR" == "18" ] && apt-add-repository universe
 
-# Install Dependencies - FIX: ADDED php8.1-redis to fix "Class Redis not found"
+# Install Dependencies - ADDED php8.1-redis to fix "Class Redis not found"
 apt-get install -y php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl,redis} mariadb-server nginx tar unzip git redis-server psmisc net-tools
 
 # Enable services
@@ -557,7 +556,7 @@ curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
 # Update repositories list
 apt-get update -y && apt-get upgrade -y
 
-# Install Dependencies - FIX: ADDED php8.1-redis to fix "Class Redis not found"
+# Install Dependencies - ADDED php8.1-redis to fix "Class Redis not found"
 apt-get install -y php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl,redis} mariadb-server nginx tar unzip git redis-server psmisc net-tools
 
 # Enable services
@@ -580,7 +579,7 @@ if [ "$OS_VER_MAJOR" == "7" ]; then
     yum-config-manager -y --disable remi-php54
     yum-config-manager -y --enable remi-php81
 
-    # Install dependencies - FIX: ADDED php-redis to fix "Class Redis not found"
+    # Install dependencies - ADDED php-redis to fix "Class Redis not found"
     yum -y install php php-common php-tokenizer php-curl php-fpm php-cli php-json php-mysqlnd php-mcrypt php-gd php-mbstring php-pdo php-zip php-bcmath php-dom php-opcache php-intl php-redis mariadb-server nginx curl tar zip unzip git redis psmisc net-tools
     yum update -y
   elif [ "$OS_VER_MAJOR" == "8" ]; then
@@ -594,7 +593,7 @@ if [ "$OS_VER_MAJOR" == "7" ]; then
     # Install MariaDB
     yum install -y mariadb mariadb-server
 
-    # Install dependencies - FIX: ADDED php-redis to fix "Class Redis not found"
+    # Install dependencies - ADDED php-redis to fix "Class Redis not found"
     yum install -y php php-common php-fpm php-cli php-json php-mysqlnd php-gd php-mbstring php-pdo php-zip php-bcmath php-dom php-opcache php-intl php-redis mariadb-server nginx curl tar zip unzip git redis psmisc net-tools
     yum update -y
 fi
