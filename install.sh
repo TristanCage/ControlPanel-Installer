@@ -7,7 +7,7 @@ set -e
 # 
 #         Pterodactyl-AutoThemes Installation
 #
-#         Created and maintained by Ferks-FK
+#         Created and maintained by ɢᴏᴏᴅɴᴇꜱꜱ ᴛᴇᴄʜ 
 #
 #            Protected by MIT License
 #
@@ -501,6 +501,21 @@ esac
 systemctl enable controlpanel.service --now
 }
 
+# NEW FUNCTION: Install basic dependencies to prevent crashes
+basic_deps() {
+  print "Installing basic system utilities..."
+  case "$OS" in
+    debian | ubuntu)
+      apt-get update -y -qq
+      # Adding dirmngr to fix potential issues with key fetching (e.g., MariaDB/Sury)
+      apt-get install -y -qq dirmngr curl git wget unzip tar net-tools
+    ;;
+    centos)
+      yum install -y -q epel-release curl git wget unzip tar net-tools
+    ;;
+  esac
+}
+
 deps_ubuntu() {
 print "Installing dependencies for Ubuntu ${OS_VER}"
 
@@ -517,7 +532,7 @@ apt-get update -y && apt-get upgrade -y
 # Add universe repository if you are on Ubuntu 18.04
 [ "$OS_VER_MAJOR" == "18" ] && apt-add-repository universe
 
-# Install Dependencies
+# Install Dependencies - ADDED php8.1-intl explicitly
 apt-get install -y php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl} mariadb-server nginx tar unzip git redis-server psmisc net-tools
 
 # Enable services
@@ -527,10 +542,10 @@ enable_services_debian_based
 deps_debian() {
 print "Installing dependencies for Debian ${OS_VER}"
 
-# MariaDB need dirmngr
+# MariaDB need dirmngr - already done in basic_deps but kept just in case
 apt-get install -y dirmngr
 
-# install PHP 8.0 using sury's repo
+# install PHP 8.1 using sury's repo
 apt-get install -y ca-certificates apt-transport-https lsb-release
 wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
 echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list
@@ -541,7 +556,7 @@ curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
 # Update repositories list
 apt-get update -y && apt-get upgrade -y
 
-# Install Dependencies
+# Install Dependencies - ADDED php8.1-intl explicitly
 apt-get install -y php8.1 php8.1-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip,intl} mariadb-server nginx tar unzip git redis-server psmisc net-tools
 
 # Enable services
@@ -559,12 +574,12 @@ if [ "$OS_VER_MAJOR" == "7" ]; then
     curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
 
     # Add remi repo (php8.1)
-    yum install -y epel-release http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+    yum install -y http://rpms.remirepo.net/enterprise/remi-release-7.rpm
     yum install -y yum-utils
     yum-config-manager -y --disable remi-php54
     yum-config-manager -y --enable remi-php81
 
-    # Install dependencies
+    # Install dependencies - ADDED php-intl explicitly
     yum -y install php php-common php-tokenizer php-curl php-fpm php-cli php-json php-mysqlnd php-mcrypt php-gd php-mbstring php-pdo php-zip php-bcmath php-dom php-opcache php-intl mariadb-server nginx curl tar zip unzip git redis psmisc net-tools
     yum update -y
   elif [ "$OS_VER_MAJOR" == "8" ]; then
@@ -572,13 +587,13 @@ if [ "$OS_VER_MAJOR" == "7" ]; then
     yum install -y policycoreutils selinux-policy selinux-policy-targeted setroubleshoot-server setools setools-console mcstrans
     
     # Add remi repo (php8.1)
-    yum install -y epel-release http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+    yum install -y http://rpms.remirepo.net/enterprise/remi-release-8.rpm
     yum module enable -y php:remi-8.1
 
     # Install MariaDB
     yum install -y mariadb mariadb-server
 
-    # Install dependencies
+    # Install dependencies - ADDED php-intl explicitly
     yum install -y php php-common php-fpm php-cli php-json php-mysqlnd php-gd php-mbstring php-pdo php-zip php-bcmath php-dom php-opcache php-intl mariadb-server nginx curl tar zip unzip git redis psmisc net-tools
     yum update -y
 fi
@@ -594,10 +609,15 @@ install_controlpanel() {
 print "Starting installation, this may take a few minutes, please wait."
 sleep 2
 
+# Check Distro again for accurate dependency targeting
+check_distro
+
+# Install basic dependencies first (NEW)
+basic_deps
+
 case "$OS" in
   debian | ubuntu)
     apt-get update -y && apt-get upgrade -y
-
     [ "$OS" == "ubuntu" ] && deps_ubuntu
     [ "$OS" == "debian" ] && deps_debian
   ;;
@@ -622,25 +642,122 @@ configure_webserver
 bye
 }
 
+# NEW FUNCTION: Uninstall the panel and all related files
+uninstall_controlpanel() {
+    print_warning "This process will remove the ControlPanel installation, database, and configurations."
+    echo -n "* Are you absolutely sure you want to uninstall ControlPanel? (y/N): "
+    read -r CONFIRM_UNINSTALL
+    [[ "$CONFIRM_UNINSTALL" != [Yy] ]] && print_error "Uninstallation aborted!" && exit 1
+
+    if [ ! -f "$INFORMATIONS/install.info" ]; then
+        print_error "Could not find installation log file ($INFORMATIONS/install.info). Manual cleanup is required."
+        exit 1
+    fi
+
+    print "Reading installation details..."
+    DB_NAME=$(grep '* Database Name:' "$INFORMATIONS/install.info" | awk '{print $4}')
+    DB_USER=$(grep '* Database User:' "$INFORMATIONS/install.info" | awk '{print $4}')
+    DB_PASS=$(grep '* Database Pass:' "$INFORMATIONS/install.info" | awk '{print $4}')
+    FQDN=$(grep '* Hostname/FQDN:' "$INFORMATIONS/install.info" | awk '{print $2}')
+    
+    # Check if mysql has a password
+    MYSQL_ROOT_PASS=""
+    if ! mysql -u root -e "SHOW DATABASES;" &>/dev/null; then
+      print_warning "It looks like your MySQL has a password, please enter it now to remove the database:"
+      password_input MYSQL_ROOT_PASS "MySQL Password: " "Password cannot by empty!"
+    fi
+
+    print "Stopping services..."
+    systemctl stop controlpanel.service || true
+
+    print "Removing Database and User ($DB_NAME, $DB_USER)..."
+    if [ -n "$MYSQL_ROOT_PASS" ]; then
+      mysql -u root -p"$MYSQL_ROOT_PASS" -e "DROP DATABASE IF EXISTS ${DB_NAME};" &>/dev/null
+      mysql -u root -p"$MYSQL_ROOT_PASS" -e "DROP USER IF EXISTS '${DB_USER}'@'%';" &>/dev/null
+      mysql -u root -p"$MYSQL_ROOT_PASS" -e "FLUSH PRIVILEGES;" &>/dev/null
+    else
+      mysql -u root -e "DROP DATABASE IF EXISTS ${DB_NAME};" &>/dev/null
+      mysql -u root -e "DROP USER IF EXISTS '${DB_USER}'@'%';" &>/dev/null
+      mysql -u root -e "FLUSH PRIVILEGES;" &>/dev/null
+    fi
+
+    print "Removing Nginx configuration..."
+    if [ -f "/etc/nginx/sites-enabled/controlpanel.conf" ]; then
+        rm -f /etc/nginx/sites-enabled/controlpanel.conf
+    fi
+    if [ -f "/etc/nginx/sites-available/controlpanel.conf" ]; then
+        rm -f /etc/nginx/sites-available/controlpanel.conf
+    fi
+    if [ -f "/etc/nginx/conf.d/controlpanel.conf" ]; then
+        rm -f /etc/nginx/conf.d/controlpanel.conf
+    fi
+    
+    print "Removing systemd service..."
+    systemctl disable controlpanel.service || true
+    rm -f /etc/systemd/system/controlpanel.service
+    systemctl daemon-reload || true
+
+    print "Removing Crontab entry..."
+    crontab -l | grep -v 'php /var/www/controlpanel/artisan schedule:run' | crontab -
+
+    print "Removing panel files ($YELLOW/var/www/controlpanel${RESET})..."
+    rm -rf /var/www/controlpanel
+
+    print "Removing install logs ($YELLOW$INFORMATIONS${RESET})..."
+    rm -rf "$INFORMATIONS"
+
+    print "Restarting Nginx..."
+    systemctl restart nginx || true
+
+    print_success "ControlPanel has been successfully uninstalled."
+    exit 0
+}
+
+
 main() {
+# Check Distro first to set variables for upgrade/install
+check_distro
+
 # Check if it is already installed and check the version #
 if [ -d "/var/www/controlpanel" ]; then
   update_variables
-  if [ "$CLIENT_VERSION" != "$LATEST_VERSION" ]; then
-      print_warning "You already have the panel installed."
-      echo -ne "* The script detected that the version of your panel is ${YELLOW}$CLIENT_VERSION${RESET}, the latest version of the panel is ${YELLOW}$LATEST_VERSION${RESET}, would you like to upgrade? (y/N): "
-      read -r UPGRADE_PANEL
-      if [[ "$UPGRADE_PANEL" =~ [Yy] ]]; then
-          check_distro
+  
+  # New Menu for Installed Panel
+  print_brake 75
+  print_warning "The ControlPanel seems to be already installed."
+  print "* Current Version: ${YELLOW}$CLIENT_VERSION${RESET} | Latest Version: ${YELLOW}$LATEST_VERSION${RESET}"
+  echo
+  echo -e "* Select an option:"
+  echo -e "  ${GREEN}1)${RESET} Upgrade Panel (Current Logic)"
+  echo -e "  ${RED}2)${RESET} Uninstall Panel (Cleanup all files and DB)"
+  echo -e "  ${YELLOW}3)${RESET} Exit"
+  echo -ne "* Enter your choice (1-3): "
+  read -r PANEL_CHOICE
+  print_brake 75
+
+  case $PANEL_CHOICE in
+    1)
+      if [ "$CLIENT_VERSION" != "$LATEST_VERSION" ]; then
           only_upgrade_panel
         else
-          print "Ok, bye..."
+          print "Panel is already up-to-date. Aborting..."
           exit 1
       fi
-    else
-      print_warning "The panel is already installed, aborting..."
+    ;;
+    2)
+      uninstall_controlpanel
+    ;;
+    3)
+      print "Exiting script. Bye..."
       exit 1
-  fi
+    ;;
+    *)
+      print_error "Invalid choice. Exiting..."
+      exit 1
+    ;;
+  esac
+
+  exit 1
 fi
 
 # Check if pterodactyl is installed #
@@ -660,9 +777,6 @@ if [ ! -d "/var/www/pterodactyl" ]; then
     fi
   fi
 fi
-
-# Check Distro #
-check_distro
 
 # Check if the OS is compatible #
 check_compatibility
